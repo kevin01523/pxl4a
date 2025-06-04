@@ -1,54 +1,42 @@
-name: Cherry-pick MSM Commit to KSU Branches
+- name: Set up Git
+  run: |
+    set -x
+    git config user.name "github-actions[bot]"
+    git config user.email "github-actions[bot]@users.noreply.github.com"
 
-on:
-  workflow_dispatch: # Manual trigger
+- name: Find ksu branches
+  id: find_ksu
+  run: |
+    set -x
+    ksu_branches=$(git branch -r | grep 'origin/.*ksu' | sed 's|origin/||')
+    echo "Detected ksu branches:"
+    echo "$ksu_branches"
+    echo "ksu_branches<<EOF" >> $GITHUB_OUTPUT
+    echo "$ksu_branches" >> $GITHUB_OUTPUT
+    echo "EOF" >> $GITHUB_OUTPUT
 
-jobs:
-  cherry-pick-msm-commit:
-    runs-on: ubuntu-latest
+- name: Cherry-pick MSM commit into each ksu branch
+  env:
+    MSM_REPO: "https://github.com/kevin01523/kernel_google_msm-4.14.git"
+    MSM_COMMIT: "7c474f261e0a8f85b63f26a3bf132c1538d7f568"
+    GH_TOKEN: ${{ secrets.PAT }}
+  run: |
+    set -x
+    for branch in ${{ steps.find_ksu.outputs.ksu_branches }}
+    do
+      echo "Processing branch $branch"
+      git checkout $branch
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # To fetch all branches
-          token: ${{ secrets.PAT }}
+      # Add MSM repo and fetch the commit
+      git remote add msm $MSM_REPO || true
+      git fetch msm $MSM_COMMIT
 
-      - name: Set up Git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-      - name: Find ksu branches
-        id: find_ksu
-        run: |
-          ksu_branches=$(git branch -r | grep 'origin/.*ksu' | sed 's|origin/||')
-          echo "$ksu_branches"
-          echo "ksu_branches<<EOF" >> $GITHUB_OUTPUT
-          echo "$ksu_branches" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
-      - name: Cherry-pick MSM commit into each ksu branch
-        env:
-          MSM_REPO: "https://github.com/kevin01523/kernel_google_msm-4.14.git"
-          MSM_COMMIT: "7c474f261e0a8f85b63f26a3bf132c1538d7f568"
-          GH_TOKEN: ${{ secrets.PAT }}
-        run: |
-          for branch in ${{ steps.find_ksu.outputs.ksu_branches }}
-          do
-            echo "Processing branch $branch"
-            git checkout $branch
-
-            # Add MSM repo and fetch the commit
-            git remote add msm $MSM_REPO || true
-            git fetch msm $MSM_COMMIT
-
-            # Cherry-pick the commit
-            if git cherry-pick $MSM_COMMIT; then
-              echo "Cherry-pick successful, pushing to origin/$branch"
-              git push https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git $branch
-            else
-              echo "Cherry-pick failed (conflict), aborting and skipping $branch"
-              git cherry-pick --abort
-            fi
-          done
+      # Cherry-pick the commit
+      if git cherry-pick $MSM_COMMIT; then
+        echo "Cherry-pick successful, pushing to origin/$branch"
+        git push https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git $branch
+      else
+        echo "Cherry-pick failed (conflict), aborting and skipping $branch"
+        git cherry-pick --abort
+      fi
+    done
