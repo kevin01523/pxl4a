@@ -1,7 +1,7 @@
 name: Cherry-pick MSM Commit to KSU Branches
 
 on:
-  workflow_dispatch: # Manual trigger
+  workflow_dispatch:
 
 jobs:
   cherry-pick-msm-commit:
@@ -11,7 +11,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # To fetch all branches
+          fetch-depth: 0 # Fetch all branches
           token: ${{ secrets.PAT }}
 
       - name: Set up Git
@@ -54,13 +54,14 @@ jobs:
               echo "Cherry-pick successful, pushing to origin/$branch"
               git push https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git $branch
             else
-              echo "Cherry-pick failed (conflict), showing conflict details for $branch"
-              echo "Conflicting files:"
+              echo -e "\033[1;31mCherry-pick failed (conflict), showing conflict details for $branch\033[0m"
+              echo -e "\033[1;33mConflicting files:\033[0m"
               git status --untracked-files=no
-              echo "Conflict hunks:"
-              git diff
+              echo -e "\033[1;33mConflict hunks (with colors):\033[0m"
+              # Use --color=always to preserve color in diff output for GitHub Actions log
+              git diff --color=always | cat
               git cherry-pick --abort
-              echo "Cherry-pick aborted for $branch"
+              echo -e "\033[1;31mCherry-pick aborted for $branch\033[0m"
             fi
             echo "=============================================="
           done
