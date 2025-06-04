@@ -1,17 +1,18 @@
-name: Auto-Merge MSM Commit to KSU Branches
+name: Cherry-pick MSM Commit to KSU Branches
 
 on:
-  workflow_dispatch: # Manual trigger; you can switch to schedule or push as needed
+  workflow_dispatch: # Manual trigger
 
 jobs:
-  merge-msm-commit:
+  cherry-pick-msm-commit:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout target repo
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref }} # Workflow runs on the branch being targeted
+          fetch-depth: 0 # To fetch all branches
+          token: ${{ secrets.PAT }}
 
       - name: Set up Git
         run: |
@@ -19,32 +20,35 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Find ksu branches
-        id: find_ksu_branches
+        id: find_ksu
         run: |
-          git fetch --all
-          ksu_branches=$(git branch -r | grep 'origin/.*ksu' | sed 's|origin/||' | tr '\n' ' ')
-          echo "ksu_branches=$ksu_branches" >> $GITHUB_OUTPUT
+          ksu_branches=$(git branch -r | grep 'origin/.*ksu' | sed 's|origin/||')
+          echo "$ksu_branches"
+          echo "ksu_branches<<EOF" >> $GITHUB_OUTPUT
+          echo "$ksu_branches" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Merge MSM commit into each ksu branch
-        id: merge_commit
+      - name: Cherry-pick MSM commit into each ksu branch
+        env:
+          MSM_REPO: "https://github.com/kevin01523/kernel_google_msm-4.14.git"
+          MSM_COMMIT: "7c474f261e0a8f85b63f26a3bf132c1538d7f568"
+          GH_TOKEN: ${{ secrets.PAT }}
         run: |
-          set -e
-          MSM_REPO="https://github.com/kevin01523/kernel_google_msm-4.14.git"
-          MSM_COMMIT="7c474f261e0a8f85b63f26a3bf132c1538d7f568"
-          for branch in ${{ steps.find_ksu_branches.outputs.ksu_branches }}; do
-            echo "Checking out $branch"
+          for branch in ${{ steps.find_ksu.outputs.ksu_branches }}
+          do
+            echo "Processing branch $branch"
             git checkout $branch
 
-            echo "Adding MSM repo as remote"
+            # Add MSM repo and fetch the commit
             git remote add msm $MSM_REPO || true
             git fetch msm $MSM_COMMIT
 
-            echo "Attempting merge"
-            git merge --no-ff --no-commit $MSM_COMMIT || { echo "Merge conflict in $branch, skipping"; git merge --abort; continue; }
-
-            echo "Committing merge"
-            git commit -am "Merge msm commit $MSM_COMMIT into $branch"
-
-            echo "Pushing to origin/$branch"
-            git push origin $branch
+            # Cherry-pick the commit
+            if git cherry-pick $MSM_COMMIT; then
+              echo "Cherry-pick successful, pushing to origin/$branch"
+              git push https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git $branch
+            else
+              echo "Cherry-pick failed (conflict), aborting and skipping $branch"
+              git cherry-pick --abort
+            fi
           done
