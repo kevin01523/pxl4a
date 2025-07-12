@@ -2,11 +2,6 @@ name: Revert Specified Commits
 
 on:
   workflow_dispatch:
-    inputs:
-      branch:
-        description: 'Target branch to revert commits on'
-        required: true
-        default: 'blu_spark_ksu_next_susfs-13'
 
 jobs:
   revert_commits:
@@ -15,20 +10,31 @@ jobs:
     - name: Checkout target branch
       uses: actions/checkout@v4
       with:
-        ref: ${{ github.event.inputs.branch }}
+        ref: blu_spark_ksu_next_susfs-13
+        fetch-depth: 0
 
     - name: Set up Git
       run: |
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
 
-    - name: Revert commits
-      run: |
-        git revert 1bdef623de9c3203a5072a10590f616ec0e98064 --no-edit
-        git revert f3a23f4 --no-edit
-        git revert 0f9aed02206f9979f983e6dfa3f9b044b38b813f --no-edit
-        git revert f3a23f4388d81f3ac34e469a0a43ff0ec6872c11 --no-edit
+    - name: Show recent commits for debugging
+      run: git log --oneline --decorate --graph -30
+
+    - name: Revert commit 1
+      run: git revert 1bdef623de9c3203a5072a10590f616ec0e98064 --no-edit || echo "Revert failed for 1bdef623de9c3203a5072a10590f616ec0e98064"
+
+    - name: Revert commit 2
+      run: git revert f3a23f4 --no-edit || echo "Revert failed for f3a23f4"
+
+    - name: Revert commit 3
+      run: git revert 0f9aed02206f9979f983e6dfa3f9b044b38b813f --no-edit || echo "Revert failed for 0f9aed02206f9979f983e6dfa3f9b044b38b813f"
+
+    - name: Revert commit 4
+      run: git revert f3a23f4388d81f3ac34e469a0a43ff0ec6872c11 --no-edit || echo "Revert failed for f3a23f4388d81f3ac34e469a0a43ff0ec6872c11"
+
+    - name: Show git status
+      run: git status
 
     - name: Push changes
-      run: |
-        git push origin HEAD:${{ github.event.inputs.branch }}
+      run: git push origin HEAD:blu_spark_ksu_next_susfs-13
