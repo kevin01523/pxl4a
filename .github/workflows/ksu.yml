@@ -58,8 +58,19 @@ jobs:
                 echo -e "\033[1;31mCherry-pick conflict detected for $branch. Prioritizing OURS and continuing.\033[0m"
                 echo -e "\033[1;33mConflicting files:\033[0m"
                 git status --untracked-files=no
+
                 echo -e "\033[1;33mConflict hunks (with colors):\033[0m"
                 git diff --color=always | cat
+
+                # Write conflicts to a file for artifact upload
+                echo "## Cherry-pick conflict for branch $branch (commit $commit)" > conflicts.txt
+                echo "### Conflicting files:" >> conflicts.txt
+                git status --untracked-files=no | grep "both modified:" | sed 's/.*both modified: //' >> conflicts.txt
+                echo "" >> conflicts.txt
+                echo "### Conflict hunks:" >> conflicts.txt
+                git diff >> conflicts.txt
+
+                # Continue by resolving in favor of ours
                 git checkout --ours .
                 git add .
                 git cherry-pick --continue
@@ -69,3 +80,11 @@ jobs:
             done
             echo "=============================================="
           done
+
+      - name: Upload conflicts report (if present)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: conflicts-report
+          path: conflicts.txt
+          if-no-files-found: ignore
