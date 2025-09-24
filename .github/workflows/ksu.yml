@@ -1,4 +1,4 @@
-name: Cherry-pick MSM Commits to KSU Branches
+name: Cherry-pick MSM Commit to KSU Branches
 
 on:
   workflow_dispatch:
@@ -31,10 +31,10 @@ jobs:
           echo "$ksu_branches" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Cherry-pick MSM commits into each ksu branch
+      - name: Cherry-pick MSM commit into each ksu branch
         env:
           MSM_REPO: "https://github.com/kevin01523/kernel_google_msm-4.14.git"
-          MSM_COMMITS: "9805957d2bb3d5de95e3a62073d7ea6684ee04f3 52f939247bebd20bc196b28b3dee027f8ae8ae1e"
+          MSM_COMMIT: "7c474f261e0a8f85b63f26a3bf132c1538d7f568"
           GH_TOKEN: ${{ secrets.PAT }}
         run: |
           set -x
@@ -44,47 +44,26 @@ jobs:
             echo "Processing branch $branch"
             git checkout $branch
 
-            # Add MSM repo and fetch the commits
+            # Add MSM repo and fetch the commit
             echo "Adding MSM remote if not already present"
             git remote add msm $MSM_REPO || true
-            for commit in $MSM_COMMITS; do
-              git fetch msm $commit
+            git fetch msm $MSM_COMMIT
 
-              # Cherry-pick the commit
-              if git cherry-pick $commit; then
-                echo "Cherry-pick $commit successful, pushing to origin/$branch"
-                git push https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git $branch
-              else
-                echo -e "\033[1;31mCherry-pick conflict detected for $branch. Prioritizing OURS and continuing.\033[0m"
-                echo -e "\033[1;33mConflicting files:\033[0m"
-                git status --untracked-files=no
-
-                echo -e "\033[1;33mConflict hunks (with colors):\033[0m"
-                git diff --color=always | cat
-
-                # Write conflicts to a file for artifact upload
-                echo "## Cherry-pick conflict for branch $branch (commit $commit)" > conflicts.txt
-                echo "### Conflicting files:" >> conflicts.txt
-                git status --untracked-files=no | grep "both modified:" | sed 's/.*both modified: //' >> conflicts.txt
-                echo "" >> conflicts.txt
-                echo "### Conflict hunks:" >> conflicts.txt
-                git diff >> conflicts.txt
-
-                # Continue by resolving in favor of ours
-                git checkout --ours .
-                git add .
-                git cherry-pick --continue
-                echo -e "\033[1;32mCherry-pick continued after resolving in favor of ours. Pushing to origin/$branch\033[0m"
-                git push https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git $branch
-              fi
-            done
+            # Cherry-pick the commit
+            if git cherry-pick $MSM_COMMIT; then
+              echo "Cherry-pick successful, pushing to origin/$branch"
+              git push https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git $branch
+            else
+              echo -e "\033[1;31mCherry-pick conflict detected for $branch. Prioritizing OURS and continuing.\033[0m"
+              echo -e "\033[1;33mConflicting files:\033[0m"
+              git status --untracked-files=no
+              echo -e "\033[1;33mConflict hunks (with colors):\033[0m"
+              git diff --color=always | cat
+              git checkout --ours .
+              git add .
+              git cherry-pick --continue
+              echo -e "\033[1;32mCherry-pick continued after resolving in favor of ours. Pushing to origin/$branch\033[0m"
+              git push https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git $branch
+            fi
             echo "=============================================="
           done
-
-      - name: Upload conflicts report (if present)
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: conflicts-report
-          path: conflicts.txt
-          if-no-files-found: ignore
