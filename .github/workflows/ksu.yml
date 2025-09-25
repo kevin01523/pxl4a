@@ -34,7 +34,8 @@ jobs:
       - name: Cherry-pick MSM commit into each ksu branch
         env:
           MSM_REPO: "https://github.com/kevin01523/kernel_google_msm-4.14.git"
-          MSM_COMMIT: "7c474f261e0a8f85b63f26a3bf132c1538d7f568"
+          MSM_COMMIT: "d6e838c3465950200b736bd557086f3cf3465592"
+          MSM_COMMIT2: "1e9a7c377c1b0690c740bde0519c3f099606f032"
           GH_TOKEN: ${{ secrets.PAT }}
         run: |
           set -x
@@ -48,9 +49,10 @@ jobs:
             echo "Adding MSM remote if not already present"
             git remote add msm $MSM_REPO || true
             git fetch msm $MSM_COMMIT
+            git fetch msm $MSM_COMMIT2
 
             # Cherry-pick the commit
-            if git cherry-pick $MSM_COMMIT; then
+            if git cherry-pick $MSM_COMMIT $MSM_COMMIT2; then
               echo "Cherry-pick successful, pushing to origin/$branch"
               git push https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git $branch
             else
