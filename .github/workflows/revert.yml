@@ -22,10 +22,10 @@ jobs:
       run: git log --oneline --decorate --graph -30
 
     - name: Revert commit 1
-      run: git revert 1bdef623de9c3203a5072a10590f616ec0e98064 --no-edit || echo "Revert failed for 1bdef623de9c3203a5072a10590f616ec0e98064"
+      run: git revert 5be712ced5c11dca0618b70b20d006955b4ff28b --no-edit || echo "Revert failed for 5be712ced5c11dca0618b70b20d006955b4ff28b"
 
     - name: Revert commit 2
-      run: git revert f3a23f4 --no-edit || echo "Revert failed for f3a23f4"
+      run: git revert 6a1a34807f72e1bb039c85d83f758138bae987ad --no-edit || echo "Revert failed for 6a1a34807f72e1bb039c85d83f758138bae987ad"
 
     - name: Revert commit 3
       run: git revert 0f9aed02206f9979f983e6dfa3f9b044b38b813f --no-edit || echo "Revert failed for 0f9aed02206f9979f983e6dfa3f9b044b38b813f"
