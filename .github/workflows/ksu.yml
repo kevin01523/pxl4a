@@ -52,7 +52,23 @@ jobs:
             git fetch msm $MSM_COMMIT2
 
             # Cherry-pick the commit
-            if git cherry-pick $MSM_COMMIT $MSM_COMMIT2; then
+            if git cherry-pick $MSM_COMMIT; then
+              echo "Cherry-pick successful, pushing to origin/$branch"
+              git push https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git $branch
+            else
+              echo -e "\033[1;31mCherry-pick conflict detected for $branch. Prioritizing OURS and continuing.\033[0m"
+              echo -e "\033[1;33mConflicting files:\033[0m"
+              git status --untracked-files=no
+              echo -e "\033[1;33mConflict hunks (with colors):\033[0m"
+              git diff --color=always | cat
+              git checkout --ours .
+              git add .
+              git cherry-pick --continue
+              echo -e "\033[1;32mCherry-pick continued after resolving in favor of ours. Pushing to origin/$branch\033[0m"
+              git push https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git $branch
+            fi
+            echo "=============================================="
+            if git cherry-pick $MSM_COMMIT2; then
               echo "Cherry-pick successful, pushing to origin/$branch"
               git push https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git $branch
             else
