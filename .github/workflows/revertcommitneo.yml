@@ -26,6 +26,9 @@ jobs:
     - name: soft reset to head
       run: git reset --soft 5dd466ed0c3fe9ca675158abf89caa93ea02a4f1
 
+    - name: Commit changes
+      run: git commit
+
 
      
     - name: Show git status
