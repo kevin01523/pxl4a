@@ -30,11 +30,11 @@ jobs:
           git fetch AOSP-buildout 
           
       - name: Cherry-pick commits with conflict highlighting
+        id: cherry
         shell: bash
-        run: |
-          set -uo pipefail
-
-          commits=(
+        env:
+          # keep commits inline here (you can replace with workflow input or secret)
+          CHERRY_COMMITS: |
             68acd6966ac98c4610813cec759afb33015d2329
             6fd077b902f900c210af7b4a157123fe256d27ac
             64db0dfa2f8aa6c519dbf21eb65c9b89643cda3d
@@ -47,62 +47,152 @@ jobs:
             38073d5f07d564770705d6bf0ccd548376463e56
             c28a68e381005be050bb81a7b893135b17db114b
             02bdfd4c16a4b1daacf463f98e902cfddf52e73b
-          )
+        run: |
+          set -uo pipefail
+          export TERM=xterm-256color
 
-          # Minimal git identity for automated commits if needed
+          workspace="$GITHUB_WORKSPACE"
+          artifacts_dir="$workspace/cherry-conflicts"
+          mkdir -p "$artifacts_dir"
+
+          # minimal identity for automated commits if needed
           git config user.name "github-actions[bot]" || true
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com" || true
 
+          # Colors for terminal output
           RED='\033[0;31m'
           GREEN='\033[0;32m'
           YELLOW='\033[0;33m'
           RESET='\033[0m'
 
+          # read newline-separated commits into an array
+          mapfile -t commits <<< "$CHERRY_COMMITS" || true
+
+          failed=()
+
           for sha in "${commits[@]}"; do
+            sha="$(echo "$sha" | tr -d '[:space:]')"
+            [ -z "$sha" ] && continue
+
             echo -e "${YELLOW}==> Cherry-picking $sha${RESET}"
+            short="$(printf '%s' "$sha" | cut -c1-12)"
+            dir="$artifacts_dir/$short"
+            mkdir -p "$dir"
+
             if git cherry-pick "$sha"; then
               echo -e "${GREEN}SUCCESS: cherry-picked $sha${RESET}"
               echo -e "${GREEN}--- Patch for $sha ---${RESET}"
-              git --no-pager show --color=always "$sha" | sed -n '1,200p'
+              git --no-pager show --color=always "$sha" | sed -n '1,200p' || true
               echo
+              echo "SUCCESS" > "$dir/result.txt"
             else
               echo -e "${RED}CONFLICT: cherry-pick $sha failed${RESET}"
-              conflict_files=$(git diff --name-only --diff-filter=U || true)
+              echo "Cherry-pick $sha failed" > "$dir/result.txt"
+              failed+=("$sha")
 
-              if [ -z "$conflict_files" ]; then
-                echo -e "${RED}No unmerged files detected, but cherry-pick failed.${RESET}"
+              # record branch and status
+              git rev-parse --abbrev-ref HEAD > "$dir/current-branch.txt" || true
+              git status --porcelain > "$dir/git-status.txt" || true
+
+              # save commit metadata if available
+              if git cat-file -e "${sha}^{commit}" 2>/dev/null; then
+                git show --no-color --pretty=fuller "$sha" > "$dir/${short}.commit.txt" || true
+                git show --no-color --name-only --pretty=format:"%h %s%n%an <%ae>%n%ad" "$sha" > "$dir/${short}.meta" || true
               else
-                for f in $conflict_files; do
+                echo "$sha (commit not present locally)" > "$dir/${short}.meta"
+              fi
+
+              # find conflicting files
+              conflicts=$(git diff --name-only --diff-filter=U || true)
+              if [ -z "$conflicts" ]; then
+                echo -e "${RED}No unmerged files detected, but cherry-pick failed.${RESET}"
+                echo "No unmerged files detected for $sha (but cherry-pick failed)" > "$dir/conflicts.txt"
+                git --no-pager show --no-color --name-only --pretty=fuller HEAD > "$dir/last-head.txt" || true
+              else
+                echo "---- conflicting files ----"
+                printf '%s\n' $conflicts
+                printf 'Conflicting files for %s:\n' "$sha" > "$dir/conflicts.txt"
+                printf '%s\n' $conflicts >> "$dir/conflicts.txt"
+
+                # For logs: show colored conflict hunks and annotate GH Actions with file/line
+                for f in $conflicts; do
                   echo -e "${YELLOW}-- Conflicts in: $f${RESET}"
-                  # Find conflict marker lines and print context with marker lines highlighted red.
-                  # Also emit GitHub Actions ::error annotations pointing to the exact file+line.
+
+                  # Print colored unified diff for log
+                  git --no-pager diff --color=always --unified=3 -- "$f" || true
+
+                  # Find conflict marker lines and emit annotations and context
                   while IFS=: read -r ln _; do
                     marker_line=$ln
                     printf "::error file=%s,line=%d::Conflict marker in cherry-pick %s\n" "$f" "$marker_line" "$sha"
-
                     start=$((marker_line>3 ? marker_line-3 : 1))
                     end=$((marker_line+3))
-
-                    # Print context with file line numbers, highlight conflict markers in red
                     sed -n "${start},${end}p" "$f" \
                       | nl -ba -v${start} -w6 -s' ' \
                       | sed -E \
-                          -e "s/(<<<<<<<.*)/${RED}\1${RESET}/" \
-                          -e "s/(=======$)/${RED}\1${RESET}/" \
-                          -e "s/(>>>>>>>.*)/${RED}\1${RESET}/" || true
-
+                          -e "s/^( *[0-9]+ .*<<<<<<<.*)/${RED}\1${RESET}/" \
+                          -e "s/^( *[0-9]+ .*=======.*)/${RED}\1${RESET}/" \
+                          -e "s/^( *[0-9]+ .*>>>>>>>.*)/${RED}\1${RESET}/" || true
                   done < <(grep -n -E '^(<<<<<<<|=======|>>>>>>>)' "$f" || true)
+                done
+
+                # For artifacts: save no-color unified diffs and the working-file with markers
+                for f in $conflicts; do
+                  safe=$(echo "$f" | sed 's/[^A-Za-z0-9._-]/_/g')
+                  git --no-pager diff --no-color --unified=3 -- "$f" > "$dir/${safe}.patch" || true
+
+                  # Save the working copy containing conflict markers (preserve path)
+                  mkdir -p "$dir/working_files/$(dirname "$f")"
+                  cp --archive "$f" "$dir/working_files/$f" 2>/dev/null || true
                 done
               fi
 
-              # Reset the failed cherry-pick so the repository is clean for the next attempt
+              # abort the failed cherry-pick so the repo is clean for the next attempt
               echo -e "${YELLOW}Aborting cherry-pick and continuing with next commit...${RESET}"
               git cherry-pick --abort || true
               echo
             fi
           done
 
-          echo -e "${GREEN}Done processing all commits${RESET}"
+          # write summary of failures for quick inspection
+          summary="$artifacts_dir/failed_commits.txt"
+          : > "$summary"
+          if [ ${#failed[@]} -gt 0 ]; then
+            printf 'Failed cherry-picks (%d):\n' "${#failed[@]}" >> "$summary"
+            for c in "${failed[@]}"; do
+              if git cat-file -e "${c}^{commit}" 2>/dev/null; then
+                git show -s --format="%h %s" "$c" >> "$summary" || true
+              else
+                echo "$c (commit not present locally)" >> "$summary"
+              fi
+            done
+          else
+            echo "All cherry-picks succeeded" >> "$summary"
+          fi
+
+          echo "Artifacts written to $artifacts_dir"
+          # Intentionally exit 0 so upload-artifact runs; final failure handled later
+          exit 0
+
+      - name: Upload conflict patches artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cherry-conflicts-${{ github.run_id }}
+          path: cherry-conflicts/**
+
+      - name: Fail if any cherry-pick failed
+        if: always()
+        run: |
+          if [ -s cherry-conflicts/failed_commits.txt ]; then
+            echo "One or more cherry-picks failed. Summary:"
+            cat cherry-conflicts/failed_commits.txt
+            exit 1
+          else
+            echo "All cherry-picks succeeded."
+          fi
+
+
 
 
       - name: Push changes to blu_spark13_ksun111sus12 branch
