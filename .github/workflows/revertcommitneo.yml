@@ -1,0 +1,35 @@
+name: Revert hardsoft
+on:
+  workflow_dispatch:
+
+jobs:
+  revert_commits:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout target branch
+      uses: actions/checkout@v4
+      with:
+        ref: blu_spark_ksu_next_susfs-13
+        fetch-depth: 0
+
+    - name: Set up Git
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+
+    - name: Show recent commits for debugging
+      run: git log --oneline --decorate --graph -30
+
+    - name: Reset to default
+      run: git reset --hard 0f9aed02206f9979f983e6dfa3f9b044b38b813f
+      
+    - name: soft reset to head
+      run: git reset --soft 14a995bf072afaef17dbcb942761e2e6d051605c
+
+
+     
+    - name: Show git status
+      run: git status
+
+    - name: Push changes
+      run: git push origin HEAD:blu_spark_ksu_next_susfs-13
