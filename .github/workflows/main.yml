@@ -29,20 +29,81 @@ jobs:
           git fetch proton_zf6 68acd6966ac98c4610813cec759afb33015d2329
           git fetch AOSP-buildout 
           
-      - name: Cherry-pick commit from proton_zf6
+      - name: Cherry-pick commits with conflict highlighting
+        shell: bash
         run: |
-          git cherry-pick 68acd6966ac98c4610813cec759afb33015d2329
-          git cherry-pick 6fd077b902f900c210af7b4a157123fe256d27ac
-          git cherry-pick 64db0dfa2f8aa6c519dbf21eb65c9b89643cda3d
-          git cherry-pick 2fb42854f9d95f63434fa7cfe45910d0da6bea67
-          git cherry-pick 053b36ac54a3706c4c38d882c90f56899655f1cd
-          git cherry-pick 02005c07796ee7fafdc55ebbb15e9c910fc1bdf0
-          git cherry-pick 5ee1de3e136153a470bca7b710d48b4628710c2b
-          git cherry-pick d0b1772a4aab30d8063fe09d53ba1d98ad9a09b2
-          git cherry-pick ee17e4843af075ad2effbe5168c7cd7610612df1
-          git cherry-pick 38073d5f07d564770705d6bf0ccd548376463e56
-          git cherry-pick c28a68e381005be050bb81a7b893135b17db114b
-          git cherry-pick 02bdfd4c16a4b1daacf463f98e902cfddf52e73b
+          set -uo pipefail
+
+          commits=(
+            68acd6966ac98c4610813cec759afb33015d2329
+            6fd077b902f900c210af7b4a157123fe256d27ac
+            64db0dfa2f8aa6c519dbf21eb65c9b89643cda3d
+            2fb42854f9d95f63434fa7cfe45910d0da6bea67
+            053b36ac54a3706c4c38d882c90f56899655f1cd
+            02005c07796ee7fafdc55ebbb15e9c910fc1bdf0
+            5ee1de3e136153a470bca7b710d48b4628710c2b
+            d0b1772a4aab30d8063fe09d53ba1d98ad9a09b2
+            ee17e4843af075ad2effbe5168c7cd7610612df1
+            38073d5f07d564770705d6bf0ccd548376463e56
+            c28a68e381005be050bb81a7b893135b17db114b
+            02bdfd4c16a4b1daacf463f98e902cfddf52e73b
+          )
+
+          # Minimal git identity for automated commits if needed
+          git config user.name "github-actions[bot]" || true
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com" || true
+
+          RED='\033[0;31m'
+          GREEN='\033[0;32m'
+          YELLOW='\033[0;33m'
+          RESET='\033[0m'
+
+          for sha in "${commits[@]}"; do
+            echo -e "${YELLOW}==> Cherry-picking $sha${RESET}"
+            if git cherry-pick "$sha"; then
+              echo -e "${GREEN}SUCCESS: cherry-picked $sha${RESET}"
+              echo -e "${GREEN}--- Patch for $sha ---${RESET}"
+              git --no-pager show --color=always "$sha" | sed -n '1,200p'
+              echo
+            else
+              echo -e "${RED}CONFLICT: cherry-pick $sha failed${RESET}"
+              conflict_files=$(git diff --name-only --diff-filter=U || true)
+
+              if [ -z "$conflict_files" ]; then
+                echo -e "${RED}No unmerged files detected, but cherry-pick failed.${RESET}"
+              else
+                for f in $conflict_files; do
+                  echo -e "${YELLOW}-- Conflicts in: $f${RESET}"
+                  # Find conflict marker lines and print context with marker lines highlighted red.
+                  # Also emit GitHub Actions ::error annotations pointing to the exact file+line.
+                  while IFS=: read -r ln _; do
+                    marker_line=$ln
+                    printf "::error file=%s,line=%d::Conflict marker in cherry-pick %s\n" "$f" "$marker_line" "$sha"
+
+                    start=$((marker_line>3 ? marker_line-3 : 1))
+                    end=$((marker_line+3))
+
+                    # Print context with file line numbers, highlight conflict markers in red
+                    sed -n "${start},${end}p" "$f" \
+                      | nl -ba -v${start} -w6 -s' ' \
+                      | sed -E \
+                          -e "s/(<<<<<<<.*)/${RED}\1${RESET}/" \
+                          -e "s/(=======$)/${RED}\1${RESET}/" \
+                          -e "s/(>>>>>>>.*)/${RED}\1${RESET}/" || true
+
+                  done < <(grep -n -E '^(<<<<<<<|=======|>>>>>>>)' "$f" || true)
+                done
+              fi
+
+              # Reset the failed cherry-pick so the repository is clean for the next attempt
+              echo -e "${YELLOW}Aborting cherry-pick and continuing with next commit...${RESET}"
+              git cherry-pick --abort || true
+              echo
+            fi
+          done
+
+          echo -e "${GREEN}Done processing all commits${RESET}"
+
 
       - name: Push changes to blu_spark13_ksun111sus12 branch
         env:
