@@ -19,15 +19,18 @@ jobs:
 
     - name: Show recent commits for debugging
       run: git log --oneline --decorate --graph -30
+    - name: Get commit hash
+      run: echo "COMMIT_HASH=$(git rev-parse HEAD)" >> $GITHUB_ENV
+
 
     - name: Reset to default
       run: git reset --hard 0f9aed02206f9979f983e6dfa3f9b044b38b813f
       
     - name: soft reset to head
-      run: git reset --soft 5dd466ed0c3fe9ca675158abf89caa93ea02a4f1
+      run: git reset --soft $COMMIT_HASH
 
     - name: Commit changes
-      run: git commit
+      run: git commit -m "revert to working commit"
 
 
      
