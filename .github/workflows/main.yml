@@ -25,14 +25,38 @@ jobs:
       - name: Add proton_zf6 remote and fetch commit
         run: |
           git remote add proton_zf6 https://github.com/kdrag0n/proton_zf6.git
+          git remote add AOSP-buildout https://github.com/tbyool/android_kernel_xiaomi_sm6150.git
           git fetch proton_zf6 68acd6966ac98c4610813cec759afb33015d2329
+          git fetch AOSP-buildout 6fd077b902f900c210af7b4a157123fe256d27ac
+          git fetch AOSP-buildout 64db0dfa2f8aa6c519dbf21eb65c9b89643cda3d
+          git fetch AOSP-buildout 2fb42854f9d95f63434fa7cfe45910d0da6bea67
+          git fetch AOSP-buildout 053b36ac54a3706c4c38d882c90f56899655f1cd
+          git fetch AOSP-buildout 02005c07796ee7fafdc55ebbb15e9c910fc1bdf0
+          git fetch AOSP-buildout 5ee1de3e136153a470bca7b710d48b4628710c2b
+          git fetch AOSP-buildout d0b1772a4aab30d8063fe09d53ba1d98ad9a09b2
+          git fetch AOSP-buildout ee17e4843af075ad2effbe5168c7cd7610612df1
+          git fetch AOSP-buildout 38073d5f07d564770705d6bf0ccd548376463e56
+          git fetch AOSP-buildout c28a68e381005be050bb81a7b893135b17db114b
+          git fetch AOSP-buildout 02bdfd4c16a4b1daacf463f98e902cfddf52e73b
+
 
       - name: Cherry-pick commit from proton_zf6
         run: |
           git cherry-pick 68acd6966ac98c4610813cec759afb33015d2329
+          git cherry-pick 6fd077b902f900c210af7b4a157123fe256d27ac
+          git cherry-pick 64db0dfa2f8aa6c519dbf21eb65c9b89643cda3d
+          git cherry-pick 2fb42854f9d95f63434fa7cfe45910d0da6bea67
+          git cherry-pick 053b36ac54a3706c4c38d882c90f56899655f1cd
+          git cherry-pick 02005c07796ee7fafdc55ebbb15e9c910fc1bdf0
+          git cherry-pick 5ee1de3e136153a470bca7b710d48b4628710c2b
+          git cherry-pick d0b1772a4aab30d8063fe09d53ba1d98ad9a09b2
+          git cherry-pick ee17e4843af075ad2effbe5168c7cd7610612df1
+          git cherry-pick 38073d5f07d564770705d6bf0ccd548376463e56
+          git cherry-pick c28a68e381005be050bb81a7b893135b17db114b
+          git cherry-pick 02bdfd4c16a4b1daacf463f98e902cfddf52e73b
 
-      - name: Push changes to blu_spark_ksu_next_susfs-13 branch
+      - name: Push changes to blu_spark13_ksun111sus12 branch
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git push origin blu_spark_ksu_next_susfs-13
+          git push origin blu_spark13_ksun111sus12
