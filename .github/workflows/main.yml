@@ -107,6 +107,6 @@ jobs:
 
       - name: Push changes to blu_spark13_ksun111sus12 branch
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PAT }}
         run: |
           git push origin blu_spark13_ksun111sus12
