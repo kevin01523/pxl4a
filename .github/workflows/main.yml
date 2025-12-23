@@ -18,9 +18,9 @@ jobs:
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
 
-      - name: Switch to blu_spark_ksu_next_susfs-13 branch
+      - name: Switch to blu_spark13_ksun111sus12 branch
         run: |
-          git checkout blu_spark_ksu_next_susfs-13
+          git checkout blu_spark13_ksun111sus12
 
       - name: Add proton_zf6 remote and fetch commit
         run: |
