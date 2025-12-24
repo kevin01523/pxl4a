@@ -108,7 +108,7 @@ jobs:
       - name: Push changes to blu_spark13_ksun111sus12 branch
         uses: ad-m/github-push-action@v0.8.0
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.GH_PATS }}
           branch: blu_spark13_ksun111sus12
 
 
