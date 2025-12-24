@@ -112,7 +112,7 @@ jobs:
         uses: ad-m/github-push-action@master
         with:
           github_token: ${{ secrets.GH_PATS }}
-          repository: pxl4a/blu_spark13_ksun111sus12
-          force_with_lease: true  
+          branch:  blu_spark13_ksun111sus12
+          force: true  
 
 
