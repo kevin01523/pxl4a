@@ -19,6 +19,7 @@
 #include <linux/shmem_fs.h>
 #include <linux/uaccess.h>
 #include <linux/mm_inline.h>
+#include <linux/ctype.h>
 #include <linux/pkeys.h>
 #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
 #include <linux/susfs_def.h>
